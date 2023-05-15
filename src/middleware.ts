@@ -1,2 +1,2 @@
-export * from './middleware/lower'
-export * from './middleware/higher'
+export * from './middleware/lower.ts'
+export * from './middleware/higher.ts'

@@ -1,7 +1,7 @@
-import { getLUTs } from './fetch-lut'
-import LRUCache from './lru-cache'
-import { getImageData, mulToRound } from './utils'
-import { lower } from './middleware'
+import { getLUTs } from './fetch-lut.ts'
+import LRUCache from './lru-cache.ts'
+import { getImageData, mulToRound } from './utils.ts'
+import { lower } from './middleware.ts'
 
 export type RGB = [number, number, number]
 export type ChannelIdxList = RGB

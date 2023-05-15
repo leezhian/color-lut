@@ -1,10 +1,56 @@
-// import del from 'rollup-plugin-delete'
 import typescript from '@rollup/plugin-typescript'
 import terser from '@rollup/plugin-terser'
 import babel from '@rollup/plugin-babel'
 
-function createUMDConfig(input, output) {
-  let name = 'colorLut'
+const extensions = ['.js', '.ts']
+
+function getBabelConfig() {
+  return {
+    extensions, 
+    babelHelpers: 'bundled'
+  }
+}
+
+function createDeclarationConfig(input, output) {
+  return {
+    input,
+    output: {
+      dir: output,
+    },
+    plugins: [
+      typescript({
+        declaration: true,
+        emitDeclarationOnly: true,
+        declarationDir: output,
+      }),
+    ],
+  }
+}
+
+function createCommonJSConfig(input, output) {
+  return {
+    input,
+    output: [
+      {
+        file: `${output}.js`,
+        format: 'cjs',
+        esModule: false,
+      },
+    ],
+    plugins: [babel(getBabelConfig()), terser()],
+  }
+}
+
+function createESMConfig(input, output) {
+  return {
+    input,
+    output: { file: `${output}.js`, format: 'esm' },
+    plugins: [babel(getBabelConfig()), terser()],
+  }
+}
+
+function createUMDConfig(input, output, env) {
+  let name = 'lut'
   const fileName = output.slice('dist/'.length)
   const capitalize = (s) => s.slice(0, 1).toUpperCase() + s.slice(1)
   if (fileName !== 'index') {
@@ -14,15 +60,14 @@ function createUMDConfig(input, output) {
   return {
     input,
     output: {
-      file: `${output}.js`,
+      file: `${output}.${env}.js`,
       format: 'es',
-      name
+      name,
     },
     plugins: [
-      typescript(),
-      babel(),
-      terser()
-    ]
+      babel(getBabelConfig()),
+      ...(env === 'production' ? [terser()] : []),
+    ],
   }
 }
 
@@ -37,6 +82,10 @@ export default (args) => {
   }
 
   return [
-    createUMDConfig(`src/${c}.ts`, `dist/${c}`)
+    ...(c === 'index' ? [createDeclarationConfig(`src/${c}.ts`, 'dist')] : []),
+    createCommonJSConfig(`src/${c}.ts`, `dist/${c}`),
+    createESMConfig(`src/${c}.ts`, `dist/esm/${c}`),
+    createUMDConfig(`src/${c}.ts`, `dist/umd/${c}`, 'development'),
+    createUMDConfig(`src/${c}.ts`, `dist/umd/${c}`, 'production'),
   ]
 }
