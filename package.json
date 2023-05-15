@@ -6,11 +6,16 @@
   "main": "index.js",
   "types": "index.d.ts",
   "scripts": {
+    "prepare": "husky install",
     "prebuild": "rm -rf dist",
-    "build": "concurrently -m 4 'pnpm:build:*'",
+    "build": "concurrently -m 4 'npm:run:build:*'",
     "build:base": "rollup -c",
     "build:middleware": "rollup -c --config-middleware",
-    "pretest": "tsc --noEmit",
+    "tsc": "tsc --noEmit",
+    "lint": "npm run tsc && npm run lint:script",
+    "lint-fix": "npm run lint-fix:script",
+    "lint-fix:script": "npm run lint:script -- --fix",
+    "lint:script": "eslint '{src,tests}/**' --ext .js,.jsx,.ts,.tsx",
     "test": "ts-node src/fetch-lut.ts"
   },
   "repository": {
@@ -30,7 +35,7 @@
   },
   "homepage": "https://github.com/leezhian/color-lut",
   "files": [
-    "**"
+    "dist"
   ],
   "exports": {
     "./package.json": "./package.json",
@@ -49,12 +54,29 @@
     "@babel/core": "^7.21.8",
     "@babel/plugin-transform-typescript": "^7.21.3",
     "@babel/preset-env": "^7.21.5",
+    "@commitlint/cli": "^17.6.3",
+    "@commitlint/config-angular": "^17.6.3",
     "@rollup/plugin-babel": "^6.0.3",
     "@rollup/plugin-terser": "^0.4.1",
     "@rollup/plugin-typescript": "^11.1.1",
+    "@typescript-eslint/eslint-plugin": "^5.59.2",
+    "@typescript-eslint/parser": "^5.59.2",
     "concurrently": "^8.0.1",
+    "eslint": "^8.40.0",
+    "eslint-config-prettier": "^8.8.0",
+    "eslint-import-resolver-typescript": "^3.5.5",
+    "eslint-plugin-import": "^2.27.5",
+    "husky": "^8.0.3",
     "jest": "^29.5.0",
+    "prettier": "^2.8.8",
     "rollup": "^3.21.6",
     "typescript": "^5.0.4"
+  },
+  "prettier": {
+    "singleQuote": true,
+    "semi": false,
+    "trailingComma": "all",
+    "tabWidth": 2,
+    "proseWrap": "never"
   }
 }

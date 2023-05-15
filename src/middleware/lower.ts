@@ -3,7 +3,7 @@
  * @Date: 2023-05-15 11:53:32
  * @Description: 向下取值
  */
-import type { MiddlewareHandler } from '../index'
+import type { MiddlewareHandler } from '../index.ts'
 
 export const lower: MiddlewareHandler = (colors, channelIdxList) => {
   const [rIdx, gIdx, bIdx] = channelIdxList
