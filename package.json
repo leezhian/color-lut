@@ -1,14 +1,14 @@
 {
   "name": "color-lut",
   "private": "true",
-  "version": "1.0.0",
+  "version": "0.7.0",
   "description": "Lut processor for images.",
   "main": "index.js",
   "types": "index.d.ts",
   "scripts": {
     "prepare": "husky install",
     "prebuild": "rm -rf dist",
-    "build": "concurrently -m 4 'npm:run:build:*'",
+    "build": "concurrently -m 4 'npm:build:*'",
     "build:base": "rollup -c",
     "build:middleware": "rollup -c --config-middleware",
     "tsc": "tsc --noEmit",

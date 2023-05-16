@@ -1,7 +1,7 @@
 import { getLUTs } from './fetch-lut.ts'
 import LRUCache from './lru-cache.ts'
 import { getImageData, mulToRound } from './utils.ts'
-import { lower } from './middleware.ts'
+import { mixer } from './middleware.ts'
 
 export type RGB = [number, number, number]
 export type ChannelIdxList = RGB
@@ -17,7 +17,7 @@ class LUT {
   private middleware: MiddlewareHandler
   constructor() {
     this.cache = new LRUCache()
-    this.middleware = lower
+    this.middleware = mixer
   }
 
   /**
@@ -140,6 +140,7 @@ class LUT {
   }
 
   /**
+   * TODO：处理得不是很好，待优化
    * @description: 格式化查找表
    * @param {string} lutStr cube文件返回的字符串格式
    * @return {{table: RGB[][][], size: number}}
@@ -158,7 +159,7 @@ class LUT {
       }
 
       // 将空节点与文件头过滤掉
-      if (!str || /[a-z]/i.test(str)) return
+      if (!str || !str.trim() || /[a-z]/i.test(str)) return
 
       if (start === -1) {
         start = index
@@ -189,4 +190,4 @@ class LUT {
   }
 }
 
-export default new LUT()
+export default LUT

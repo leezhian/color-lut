@@ -49,7 +49,16 @@ export const getImageData = async (imgUrl: string): Promise<ImageData> => {
  * @param {number} b
  * @return {number[]}
  */
-export const mulToRound = (a: number, b: number) => {
+export const mulToRound = (a: number, b: number): number[] => {
   const result = a * b
-  return [result, Math.floor(result), Math.ceil(result)]
+  return [result, ...toRound(result)]
+}
+
+/**
+ * @description: 取整
+ * @param {number} value
+ * @return {number[]}
+ */
+export const toRound = (value: number): number[] => {
+  return [Math.floor(value), Math.ceil(value)]
 }
