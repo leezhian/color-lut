@@ -1,7 +1,7 @@
 {
   "name": "color-lut",
   "private": "true",
-  "version": "0.7.0",
+  "version": "0.5.0",
   "description": "Lut processor for images.",
   "main": "index.js",
   "types": "index.d.ts",
