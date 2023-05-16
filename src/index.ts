@@ -1,9 +1,10 @@
-import { getLUTs } from './fetch-lut.ts'
-import LRUCache from './lru-cache.ts'
-import { getImageData, mulToRound } from './utils.ts'
+import { getLUTs } from './utils/fetch-lut.ts'
+import LRUCache from './utils/lru-cache.ts'
+import { getImageData, mulToRound } from './utils/utils.ts'
 import { mixer } from './middleware.ts'
 
 export type RGB = [number, number, number]
+export type RGBA = [number, number, number, number]
 export type ChannelIdxList = RGB
 export type ColorTable = RGB[][][]
 export interface ColorLUT {
@@ -15,8 +16,12 @@ export type MiddlewareHandler = (colors: Record<string, RGB>, channelIdxList: Ch
 class LUT {
   private cache: LRUCache
   private middleware: MiddlewareHandler
-  constructor() {
-    this.cache = new LRUCache()
+  private threadCount: number
+  // private thread: Map<string, Worker>
+  constructor({ cacheSize = 10, threadCount = 4 }) {
+    // this.thread = new Map()
+    this.cache = new LRUCache(cacheSize)
+    this.threadCount = threadCount
     this.middleware = mixer
   }
 
@@ -32,6 +37,26 @@ class LUT {
   }
 
   /**
+   * @description: 启动线程
+   * @return {Map}
+   */  
+  // private startThread() {
+  //   if(this.threadCount <= 0) {
+  //     console.warn('Number of startup threads is 0')
+  //     return
+  //   }
+
+  //   for (let i = 0; i < this.threadCount; i++) {
+  //     const threadName = Date.now() + ''
+  //     const worker = new Worker('./worker.ts', { type: 'module', name: threadName })
+  //     this.thread.set(threadName, worker)
+  //   }
+
+  //   return this.thread
+  // }
+
+  /**
+   * TODO 迁移到单独文件，worker 需要使用 
    * @description: 查找颜色
    * @param {RGB} rgb 像素 rgb
    * @param {ColorTable} table 查找表
@@ -59,6 +84,7 @@ class LUT {
     const gFloorRowInCeilBlock = bCeilBlock[gFloorIdx]
     const gFloorRowInFloorBlock = bFloorBlock[gFloorIdx]
 
+    // 近似 rgb，最多有8个点，最少1个
     const colors = {
       [`${rFloorIdx}_${gFloorIdx}_${bFloorIdx}`]: gFloorRowInFloorBlock[rFloorIdx],
       [`${rCeilIdx}_${gFloorIdx}_${bFloorIdx}`]: gFloorRowInFloorBlock[rCeilIdx],
@@ -88,21 +114,48 @@ class LUT {
     const pixelCount = pixelData ? pixelData.length : 0 // 像素个数
     const pixelDataAfterLUT = new ImageData(imageData.width, imageData.height)
 
-    for (let i = 0; i < pixelCount; i += 4) {
-      // 素材单个像素的 rgba 值
-      const vr = pixelData[i]
-      const vg = pixelData[i + 1]
-      const vb = pixelData[i + 2]
-      const va = pixelData[i + 3]
+    // 小于 57600 个像素就忽略线程处理
+    if(this.threadCount !== 0 && pixelCount <= 57600) {
+      // TODO 线程处理
+      // const threads = this.startThread()
+      // if(!threads) {
+      //   throw new Error('No processing was done.')
+      // }
 
-      const { colors, channelIdxList } = this.lut3d([vr, vg, vb], colorLUT.table, colorLUT.size)
-      const [r, g, b] = middleware(colors, channelIdxList)
+      // threads.forEach((worker) => {
+      //   worker.onmessage = (event) => {
+      //     const { type } = event.data
 
-      pixelDataAfterLUT.data[i] = r
-      pixelDataAfterLUT.data[i + 1] = g
-      pixelDataAfterLUT.data[i + 2] = b
-      pixelDataAfterLUT.data[i + 3] = va
-    }
+      //     switch(type) {
+      //       case 'transformrgbsuccess':
+              
+      //         break
+      //       case 'transformrgberror':
+      //         const { message } = event.data
+      //         throw new Error(message)
+      //         break
+      //       default:
+      //         break
+      //     }
+      //   }
+      // })
+    } else {
+      for (let i = 0; i < pixelCount; i += 4) {
+        // 素材单个像素的 rgba 值
+        const vr = pixelData[i]
+        const vg = pixelData[i + 1]
+        const vb = pixelData[i + 2]
+        const va = pixelData[i + 3]
+  
+        const { colors, channelIdxList } = this.lut3d([vr, vg, vb], colorLUT.table, colorLUT.size)
+        const [r, g, b] = middleware(colors, channelIdxList)
+  
+        pixelDataAfterLUT.data[i] = r
+        pixelDataAfterLUT.data[i + 1] = g
+        pixelDataAfterLUT.data[i + 2] = b
+        pixelDataAfterLUT.data[i + 3] = va
+      }
+    } 
 
     return pixelDataAfterLUT
   }
