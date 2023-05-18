@@ -23,7 +23,7 @@ export const createImage = (imgUrl: string): Promise<HTMLImageElement> => {
  * @param {number} height 高度
  * @return {OffscreenCanvas}
  */
-export const createOffscreenCanvas = (width: number, height: number) =>  {
+export const createOffscreenCanvas = (width: number, height: number) => {
   const ratio = window.devicePixelRatio || 1
   const canvas = new OffscreenCanvas(width * ratio, height * ratio)
 
@@ -62,3 +62,35 @@ export const mulToRound = (a: number, b: number): number[] => {
 export const toRound = (value: number): number[] => {
   return [Math.floor(value), Math.ceil(value)]
 }
+
+export interface FnStrStruct {
+  name: string,
+  args: string,
+  body: string
+}
+
+/**
+ * @description: 函数转字符串
+ * @param {Function} fn
+ * @return {{ name: string, args: string, body: string }}
+ */
+// export const fnToStrStruct = (fn: Function): FnStrStruct => {
+//   const name = fn.name
+//   const fnStr = fn.toString()
+
+//   return {
+//     name,
+//     args: fnStr.substring(fnStr.indexOf("(") + 1, fnStr.indexOf(")")),
+//     body: fnStr.substring(fnStr.indexOf("{") + 1, fnStr.lastIndexOf("}"))
+//   }
+// }
+
+/**
+ * @description: 字符串转函数
+ * @param {Function} fn
+ * @return {{ name: string, args: string, body: string }}
+ */
+// export const strStructToFn = (struct: FnStrStruct): Function => {
+//   const fn = new Function(struct.args, struct.body)
+//   return fn
+// }

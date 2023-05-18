@@ -1,7 +1,9 @@
-import { getLUTs } from './fetch-lut.ts'
-import LRUCache from './lru-cache.ts'
-import { getImageData, mulToRound } from './utils.ts'
+import { getLUTs } from './utils/fetch-lut.ts'
+import LRUCache from './utils/lru-cache.ts'
+import { getImageData } from './utils/utils.ts'
+import { TRANSFORM_RGB_SUCCESS, TRANSFORM_RGB_ERROR, TRANSFORM_RGB } from './utils/event-types.ts'
 import { mixer } from './middleware.ts'
+import WebWorker from 'web-worker:./worker.ts'
 
 export type RGB = [number, number, number]
 export type ChannelIdxList = RGB
@@ -10,7 +12,8 @@ export interface ColorLUT {
   table: ColorTable
   size: number
 }
-export type MiddlewareHandler = (colors: Record<string, RGB>, channelIdxList: ChannelIdxList) => RGB
+export type ApprColors = Record<string, RGB> // 近似的颜色值
+export type MiddlewareHandler = (colors: ApprColors, channelIdxList: ChannelIdxList) => RGB
 
 class LUT {
   private cache: LRUCache
@@ -24,87 +27,107 @@ class LUT {
    * @description: 全局中间件
    * @return {void}
    */
-  use(middleware: MiddlewareHandler): void {
-    if (!middleware) {
-      throw new Error('Middleware is not function.')
-    }
-    this.middleware = middleware
-  }
+  // use(middleware: MiddlewareHandler): void {
+  //   if (!middleware) {
+  //     throw new Error('Middleware is not function.')
+  //   }
+  //   this.middleware = middleware
+  // }
 
   /**
    * @description: 查找颜色
    * @param {RGB} rgb 像素 rgb
    * @param {ColorTable} table 查找表
    * @param {number} size 查找表长度
-   * @return {{ colors: Record<string, RGB>, channelIdxList: ChannelIdxList }}
+   * @return {{ colors: ApprColors, channelIdxList: ChannelIdxList }}
    */
-  private lut3d(rgb: RGB, table: ColorTable, size: number): { colors: Record<string, RGB>, channelIdxList: ChannelIdxList } {
-    const [r, g, b] = rgb || []
+  // private lut3d(rgb: RGB, table: ColorTable, size: number): { colors: ApprColors, channelIdxList: ChannelIdxList } {
+  //   const [r, g, b] = rgb || []
 
-    // 转换为表中取值
-    const tr = r / 255
-    const tg = g / 255
-    const tb = b / 255
+  //   // 转换为表中取值
+  //   const tr = r / 255
+  //   const tg = g / 255
+  //   const tb = b / 255
 
-    const n = size - 1
-    const [rIdx, rFloorIdx, rCeilIdx] = mulToRound(tr, n)
-    const [gIdx, gFloorIdx, gCeilIdx] = mulToRound(tg, n)
-    const [bIdx, bFloorIdx, bCeilIdx] = mulToRound(tb, n)
-    // 找出对应 b 的索引块，共两块，有可能两块是一样的
-    const bCeilBlock = table[bCeilIdx]
-    const bFloorBlock = table[bFloorIdx]
-    // 找出每块中 g 的索引行
-    const gCeilRowInCeilBlock = bCeilBlock[gCeilIdx]
-    const gCeilRowInFloorBlock = bFloorBlock[gCeilIdx]
-    const gFloorRowInCeilBlock = bCeilBlock[gFloorIdx]
-    const gFloorRowInFloorBlock = bFloorBlock[gFloorIdx]
+  //   const n = size - 1
+  //   const [rIdx, rFloorIdx, rCeilIdx] = mulToRound(tr, n)
+  //   const [gIdx, gFloorIdx, gCeilIdx] = mulToRound(tg, n)
+  //   const [bIdx, bFloorIdx, bCeilIdx] = mulToRound(tb, n)
+  //   // 找出对应 b 的索引块，共两块，有可能两块是一样的
+  //   const bCeilBlock = table[bCeilIdx]
+  //   const bFloorBlock = table[bFloorIdx]
+  //   // 找出每块中 g 的索引行
+  //   const gCeilRowInCeilBlock = bCeilBlock[gCeilIdx]
+  //   const gCeilRowInFloorBlock = bFloorBlock[gCeilIdx]
+  //   const gFloorRowInCeilBlock = bCeilBlock[gFloorIdx]
+  //   const gFloorRowInFloorBlock = bFloorBlock[gFloorIdx]
 
-    const colors = {
-      [`${rFloorIdx}_${gFloorIdx}_${bFloorIdx}`]: gFloorRowInFloorBlock[rFloorIdx],
-      [`${rCeilIdx}_${gFloorIdx}_${bFloorIdx}`]: gFloorRowInFloorBlock[rCeilIdx],
-      [`${rFloorIdx}_${gCeilIdx}_${bFloorIdx}`]: gCeilRowInFloorBlock[rFloorIdx],
-      [`${rCeilIdx}_${gCeilIdx}_${bFloorIdx}`]: gCeilRowInFloorBlock[rCeilIdx],
-      [`${rFloorIdx}_${gFloorIdx}_${bCeilIdx}`]: gFloorRowInCeilBlock[rFloorIdx],
-      [`${rCeilIdx}_${gFloorIdx}_${bCeilIdx}`]: gFloorRowInCeilBlock[rCeilIdx],
-      [`${rFloorIdx}_${gCeilIdx}_${bCeilIdx}`]: gCeilRowInCeilBlock[rFloorIdx],
-      [`${rCeilIdx}_${gCeilIdx}_${bCeilIdx}`]: gCeilRowInCeilBlock[rCeilIdx]
-    }
+  //   const colors = {
+  //     [`${rFloorIdx}_${gFloorIdx}_${bFloorIdx}`]: gFloorRowInFloorBlock[rFloorIdx],
+  //     [`${rCeilIdx}_${gFloorIdx}_${bFloorIdx}`]: gFloorRowInFloorBlock[rCeilIdx],
+  //     [`${rFloorIdx}_${gCeilIdx}_${bFloorIdx}`]: gCeilRowInFloorBlock[rFloorIdx],
+  //     [`${rCeilIdx}_${gCeilIdx}_${bFloorIdx}`]: gCeilRowInFloorBlock[rCeilIdx],
+  //     [`${rFloorIdx}_${gFloorIdx}_${bCeilIdx}`]: gFloorRowInCeilBlock[rFloorIdx],
+  //     [`${rCeilIdx}_${gFloorIdx}_${bCeilIdx}`]: gFloorRowInCeilBlock[rCeilIdx],
+  //     [`${rFloorIdx}_${gCeilIdx}_${bCeilIdx}`]: gCeilRowInCeilBlock[rFloorIdx],
+  //     [`${rCeilIdx}_${gCeilIdx}_${bCeilIdx}`]: gCeilRowInCeilBlock[rCeilIdx]
+  //   }
 
-    return {
-      colors,
-      channelIdxList: [rIdx, gIdx, bIdx]
-    }
-  }
+  //   return {
+  //     colors,
+  //     channelIdxList: [rIdx, gIdx, bIdx]
+  //   }
+  // }
 
   /**
    * @description: 转换图片数据
    * @param {ImageData} imageData 图片数据
    * @param {ColorLUT} colorLUT
    * @param {MiddlewareHandler} middleware
-   * @return {ImageData}
-   */  
-  private transformImageData(imageData: ImageData, colorLUT: ColorLUT, middleware: MiddlewareHandler): ImageData {
-    const pixelData = imageData.data
-    const pixelCount = pixelData ? pixelData.length : 0 // 像素个数
-    const pixelDataAfterLUT = new ImageData(imageData.width, imageData.height)
+   * @return {Promise<ImageData>}
+   */
+  private transformImageData(imageData: ImageData, colorLUT: ColorLUT, middleware: MiddlewareHandler): Promise<ImageData> {
+    return new Promise((resolve, reject) => {
+      try {
+        const pixelData = imageData.data
 
-    for (let i = 0; i < pixelCount; i += 4) {
-      // 素材单个像素的 rgba 值
-      const vr = pixelData[i]
-      const vg = pixelData[i + 1]
-      const vb = pixelData[i + 2]
-      const va = pixelData[i + 3]
+        const worker = new WebWorker({ type: 'module' })
+        worker.onmessage = ((event: MessageEvent<any>) => {
+          const { type, data } = event.data
+          switch (type) {
+            case TRANSFORM_RGB_SUCCESS: {
+              const pixelDataAfterLUT = new ImageData(data, imageData.width, imageData.height)
+              resolve(pixelDataAfterLUT)
+              break
+            }
+            case TRANSFORM_RGB_ERROR: {
+              worker.terminate()
+              reject('Thread processing error.')
+            }
+          }
+        })
 
-      const { colors, channelIdxList } = this.lut3d([vr, vg, vb], colorLUT.table, colorLUT.size)
-      const [r, g, b] = middleware(colors, channelIdxList)
+        worker.onmessageerror = (() => {
+          worker.terminate()
+          reject('Thread data error')
+        })
 
-      pixelDataAfterLUT.data[i] = r
-      pixelDataAfterLUT.data[i + 1] = g
-      pixelDataAfterLUT.data[i + 2] = b
-      pixelDataAfterLUT.data[i + 3] = va
-    }
+        worker.onerror = (() => {
+          worker.terminate()
+          reject('An unknown error occurred in the thread.')
+        })
 
-    return pixelDataAfterLUT
+        worker.postMessage({
+          type: TRANSFORM_RGB,
+          data: {
+            pixelData,
+            colorLUT
+          }
+        })
+      } catch (error) {
+        reject(error)
+      }
+    })
   }
 
   /**
@@ -136,7 +159,7 @@ class LUT {
       colorLUT = lut
     }
 
-    return this.transformImageData(imageData, colorLUT, middleware??this.middleware)
+    return this.transformImageData(imageData, colorLUT, middleware ?? this.middleware)
   }
 
   /**

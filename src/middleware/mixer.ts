@@ -4,7 +4,7 @@
  * @Description: 混合生成新值
  */
 import type { MiddlewareHandler, RGB } from '../index.ts'
-import { toRound } from '../utils.ts'
+import { toRound } from '../utils/utils.ts'
 
 type ChannelVals = [number, number, number, number, number, number, number, number]
 type OffsetValList = [number, number, number]

@@ -5,10 +5,7 @@ export default {
     [
       '@babel/preset-env',
       {
-        modules: false,
-        targets: {
-          ie: 11,
-        },
+        modules: false
       },
     ],
   ],
