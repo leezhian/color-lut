@@ -1,6 +1,7 @@
 import typescript from '@rollup/plugin-typescript'
 import terser from '@rollup/plugin-terser'
 import babel from '@rollup/plugin-babel'
+import webWorkerLoader from 'rollup-plugin-web-worker-loader'
 
 const extensions = ['.js', '.ts']
 
@@ -45,7 +46,7 @@ function createESMConfig(input, output) {
   return {
     input,
     output: { file: `${output}.js`, format: 'esm' },
-    plugins: [babel(getBabelConfig()), terser()],
+    plugins: [babel(getBabelConfig()), webWorkerLoader(), terser()],
   }
 }
 
@@ -83,9 +84,9 @@ export default (args) => {
 
   return [
     ...(c === 'index' ? [createDeclarationConfig(`src/${c}.ts`, 'dist')] : []),
-    createCommonJSConfig(`src/${c}.ts`, `dist/${c}`),
+    // createCommonJSConfig(`src/${c}.ts`, `dist/${c}`),
     createESMConfig(`src/${c}.ts`, `dist/esm/${c}`),
-    createUMDConfig(`src/${c}.ts`, `dist/umd/${c}`, 'development'),
-    createUMDConfig(`src/${c}.ts`, `dist/umd/${c}`, 'production'),
+    // createUMDConfig(`src/${c}.ts`, `dist/umd/${c}`, 'development'),
+    // createUMDConfig(`src/${c}.ts`, `dist/umd/${c}`, 'production'),
   ]
 }

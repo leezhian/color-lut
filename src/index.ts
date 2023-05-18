@@ -1,7 +1,10 @@
 import { getLUTs } from './utils/fetch-lut.ts'
 import LRUCache from './utils/lru-cache.ts'
 import { getImageData, mulToRound } from './utils/utils.ts'
+import ThreadManager from './utils/thread-manager.ts'
+import type { ThreadStateListener } from './utils/thread-manager.ts'
 import { mixer } from './middleware.ts'
+import { TRANSFORM_RGB, TRANSFORM_RGB_SUCCESS, TRANSFORM_RGB_ERROR } from './utils/event-types.ts'
 
 export type RGB = [number, number, number]
 export type RGBA = [number, number, number, number]
@@ -16,11 +19,12 @@ export type MiddlewareHandler = (colors: Record<string, RGB>, channelIdxList: Ch
 class LUT {
   private cache: LRUCache
   private middleware: MiddlewareHandler
+  private threadManager: ThreadManager
   private threadCount: number
   // private thread: Map<string, Worker>
   constructor({ cacheSize = 10, threadCount = 4 }) {
-    // this.thread = new Map()
     this.cache = new LRUCache(cacheSize)
+    this.threadManager = new ThreadManager(threadCount)
     this.threadCount = threadCount
     this.middleware = mixer
   }
@@ -35,25 +39,6 @@ class LUT {
     }
     this.middleware = middleware
   }
-
-  /**
-   * @description: 启动线程
-   * @return {Map}
-   */  
-  // private startThread() {
-  //   if(this.threadCount <= 0) {
-  //     console.warn('Number of startup threads is 0')
-  //     return
-  //   }
-
-  //   for (let i = 0; i < this.threadCount; i++) {
-  //     const threadName = Date.now() + ''
-  //     const worker = new Worker('./worker.ts', { type: 'module', name: threadName })
-  //     this.thread.set(threadName, worker)
-  //   }
-
-  //   return this.thread
-  // }
 
   /**
    * TODO 迁移到单独文件，worker 需要使用 
@@ -108,56 +93,71 @@ class LUT {
    * @param {ColorLUT} colorLUT
    * @param {MiddlewareHandler} middleware
    * @return {ImageData}
-   */  
-  private transformImageData(imageData: ImageData, colorLUT: ColorLUT, middleware: MiddlewareHandler): ImageData {
-    const pixelData = imageData.data
-    const pixelCount = pixelData ? pixelData.length : 0 // 像素个数
-    const pixelDataAfterLUT = new ImageData(imageData.width, imageData.height)
+   */
+  private transformImageData(imageData: ImageData, colorLUT: ColorLUT, middleware: MiddlewareHandler): Promise<ImageData> {
+    return new Promise((resolve, reject) => {
+      const pixelData = imageData.data
+      const pixelCount = pixelData ? pixelData.length : 0 // 像素个数
+      const pixelDataAfterLUT = new ImageData(imageData.width, imageData.height)
+      // 小于 57600 个像素就忽略线程处理
+      if (this.threadCount !== 0 && pixelCount > 57600) {
 
-    // 小于 57600 个像素就忽略线程处理
-    if(this.threadCount !== 0 && pixelCount <= 57600) {
-      // TODO 线程处理
-      // const threads = this.startThread()
-      // if(!threads) {
-      //   throw new Error('No processing was done.')
-      // }
+        const callback: ThreadStateListener = (e) => {
+          const { worker } = e
 
-      // threads.forEach((worker) => {
-      //   worker.onmessage = (event) => {
-      //     const { type } = event.data
+          const handleMessage = (event: MessageEvent<any>) => {
+            const { type } = event.data
+            switch (type) {
+              case TRANSFORM_RGB: {
+                worker.postMessage({
+                  type: TRANSFORM_RGB
+                })
+                break
+              }
+              case TRANSFORM_RGB_SUCCESS: {
+                break
+              }
+              case TRANSFORM_RGB_ERROR: {
+                break
+              }
+            }
 
-      //     switch(type) {
-      //       case 'transformrgbsuccess':
-              
-      //         break
-      //       case 'transformrgberror':
-      //         const { message } = event.data
-      //         throw new Error(message)
-      //         break
-      //       default:
-      //         break
-      //     }
-      //   }
-      // })
-    } else {
-      for (let i = 0; i < pixelCount; i += 4) {
-        // 素材单个像素的 rgba 值
-        const vr = pixelData[i]
-        const vg = pixelData[i + 1]
-        const vb = pixelData[i + 2]
-        const va = pixelData[i + 3]
-  
-        const { colors, channelIdxList } = this.lut3d([vr, vg, vb], colorLUT.table, colorLUT.size)
-        const [r, g, b] = middleware(colors, channelIdxList)
-  
-        pixelDataAfterLUT.data[i] = r
-        pixelDataAfterLUT.data[i + 1] = g
-        pixelDataAfterLUT.data[i + 2] = b
-        pixelDataAfterLUT.data[i + 3] = va
+            worker.removeEventListener('message', handleMessage)
+          }
+          worker.addEventListener('message', handleMessage)
+
+        }
+
+        this.threadManager.addThreadStateListener(callback)
+        this.threadManager.requestDispatchThread()
+        // worker?.postMessage({
+        //   type: 'transformrgb'
+        // })
+
+        // worker?.addEventListener('message', (event) => {
+        //   console.log('message', event)
+        //   resolve(pixelDataAfterLUT)
+        // })
+      } else {
+        for (let i = 0; i < pixelCount; i += 4) {
+          // 素材单个像素的 rgba 值
+          const vr = pixelData[i]
+          const vg = pixelData[i + 1]
+          const vb = pixelData[i + 2]
+          const va = pixelData[i + 3]
+
+          const { colors, channelIdxList } = this.lut3d([vr, vg, vb], colorLUT.table, colorLUT.size)
+          const [r, g, b] = middleware(colors, channelIdxList)
+
+          pixelDataAfterLUT.data[i] = r
+          pixelDataAfterLUT.data[i + 1] = g
+          pixelDataAfterLUT.data[i + 2] = b
+          pixelDataAfterLUT.data[i + 3] = va
+        }
+
+        resolve(pixelDataAfterLUT)
       }
-    } 
-
-    return pixelDataAfterLUT
+    })
   }
 
   /**
@@ -189,7 +189,7 @@ class LUT {
       colorLUT = lut
     }
 
-    return this.transformImageData(imageData, colorLUT, middleware??this.middleware)
+    return this.transformImageData(imageData, colorLUT, middleware ?? this.middleware)
   }
 
   /**
@@ -240,6 +240,14 @@ class LUT {
       table: tableFor3d,
       size: lutSize
     }
+  }
+
+  /**
+   * @description: 销毁函数
+   * @return {void}
+   */
+  destroy() {
+    this.threadManager.destroy()
   }
 }
 

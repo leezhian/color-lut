@@ -5,10 +5,14 @@
 */
 /* 消息机制：
 主线程 → 子线程 { type: 消息类型, data: 通信数据 }
-子线程 → 主线程 { type: 消息类型, data: 通信数据, message?: 消息字符串 }
+子线程 → 主线程 { type: 消息类型, data?: 通信数据, message?: 消息字符串 }
 */
-import { mulToRound } from './utils'
+import { mulToRound } from './utils.ts'
+import { THREAD_IDLE_EVENT, AUTO_CLOSE_THREAD_EVENT, TRANSFORM_RGB, TRANSFORM_RGB_SUCCESS, TRANSFORM_RGB_ERROR } from './event-types.ts'
 import type { ColorLUT, RGB, ColorTable, ChannelIdxList, MiddlewareHandler } from '../index.ts'
+
+let closeTimer: number
+const AUTO_CLOSE_TIME = 3000 // 任务处理完成等待3秒自动关闭线程
 
 addEventListener(
   'message',
@@ -16,7 +20,11 @@ addEventListener(
     const { type } = e.data
 
     switch (type) {
-      case 'transformrgb': {
+      case TRANSFORM_RGB: {
+        closeTimer && clearTimeout(closeTimer)
+        self.postMessage({
+          type: THREAD_IDLE_EVENT
+        })
         const { pixelData, colorLUT, middleware, startIndex } = e.data.data
         // TODO middleware 需要转换
         await handleTransformRGB(pixelData, colorLUT, middleware, startIndex)
@@ -98,25 +106,31 @@ async function handleTransformRGB(pixelData: number[], colorLUT: ColorLUT, middl
     // 表示数据缺少了
     if (rgbaData.length !== pixelData.length) {
       self.postMessage({
-        type: 'transformrgberror',
+        type: TRANSFORM_RGB_ERROR,
         message: 'The worker data is lost.'
       })
       return
     }
 
     self.postMessage({
-      type: 'transformrgbsuccess',
+      type: TRANSFORM_RGB_SUCCESS,
       data: {
         processedData: rgbaData,
         startIndex
       }
     })
-    // 关闭 worker
-    self.close()
   } catch (e: any) {
     self.postMessage({
-      type: 'transformrgberror',
+      type: TRANSFORM_RGB_ERROR,
       message: e?.message
     })
+  } finally {
+    // 关闭 worker
+    closeTimer = setTimeout(() => {
+      self.postMessage({
+        type: AUTO_CLOSE_THREAD_EVENT
+      })
+      self.close()
+    }, AUTO_CLOSE_TIME)
   }
 }
