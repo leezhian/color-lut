@@ -93,7 +93,7 @@ class LUT {
 
         const worker = new WebWorker({ type: 'module' })
         worker.onmessage = ((event: MessageEvent<any>) => {
-          const { type, data } = event.data
+          const { type, message, data } = event.data
           switch (type) {
             case TRANSFORM_RGB_SUCCESS: {
               const pixelDataAfterLUT = new ImageData(data, imageData.width, imageData.height)
@@ -102,7 +102,7 @@ class LUT {
             }
             case TRANSFORM_RGB_ERROR: {
               worker.terminate()
-              reject('Thread processing error.')
+              reject(message)
             }
           }
         })
@@ -154,21 +154,22 @@ class LUT {
     let colorLUT: ColorLUT
     if (typeof lut === 'string') {
       const lutStr = this.cache.get(lut) ? this.cache.get(lut) : await getLUTs(lut)
-      colorLUT = this.formatColorLUT(lutStr)
+      colorLUT = /\.csp$/i.test(lut) ? this.formatColorLUTFromCSP(lutStr) : this.formatColorLUTFromCube(lutStr)
     } else {
       colorLUT = lut
     }
 
+    console.log('colorLUT', colorLUT);
+    
     return this.transformImageData(imageData, colorLUT, middleware ?? this.middleware)
   }
 
   /**
-   * TODO：处理得不是很好，待优化
    * @description: 格式化查找表
    * @param {string} lutStr cube文件返回的字符串格式
    * @return {{table: RGB[][][], size: number}}
    */
-  formatColorLUT(lutStr: string): ColorLUT {
+  formatColorLUTFromCube(lutStr: string): ColorLUT {
     const rows = lutStr.split('\n')
 
     let lutSize = 0 // lut大小
@@ -182,7 +183,7 @@ class LUT {
       }
 
       // 将空节点与文件头过滤掉
-      if (!str || !str.trim() || /[a-z]/i.test(str)) return
+      if (!str || !str.trim() || /(?!e)[a-z]/i.test(str)) return
 
       if (start === -1) {
         start = index
@@ -193,6 +194,57 @@ class LUT {
 
       // 分割rgb的值
       const rgb = str.split(' ').map(s => Number(s)) as RGB
+
+      // 构造出三维数组
+      const bIdx = Math.floor(rgbIdx / Math.pow(lutSize, 2))
+      if (!tableFor3d[bIdx]) {
+        tableFor3d[bIdx] = []
+      }
+      const gIdx = Math.floor((rgbIdx - bIdx * Math.pow(lutSize, 2)) / lutSize)
+      if (!tableFor3d[bIdx][gIdx]) {
+        tableFor3d[bIdx][gIdx] = []
+      }
+      tableFor3d[bIdx][gIdx].push(rgb)
+    })
+
+    return {
+      table: tableFor3d,
+      size: lutSize
+    }
+  }
+
+  /**
+   * @description: 格式化 CSP 格式文件
+   * @param {string} str CSP文件返回的字符串格式
+   * @return {ColorLUT}
+   */  
+  formatColorLUTFromCSP(str: string): ColorLUT {
+    const rows = str.split('\n')
+    let lutSize = 0 // lut大小
+    let start = -1 // 相对 lut文件，色彩数据开始的索引
+    const tableFor3d: RGB[][][] = []
+
+    rows.forEach((str, index) => {
+      // 将空节点与文件头过滤掉
+      if (!str || !str.trim() || /(?!e)[a-z]/i.test(str)) return
+      // 分割rgb的值
+      const rgb = str.split(' ').map(s => Number(s)) as RGB
+      if(rgb.length !== 3) return
+
+      // 判断是否是标识 lut 文件大小的字段
+      if(rgb[0] > 1 && rgb.every(v => v === rgb[0])) {
+        console.log(rgb);
+        
+        lutSize = rgb[0]
+        return
+      }
+
+      if (start === -1) {
+        start = index
+      }
+
+      // 计算色彩数据真实的索引
+      const rgbIdx = index - start
 
       // 构造出三维数组
       const bIdx = Math.floor(rgbIdx / Math.pow(lutSize, 2))

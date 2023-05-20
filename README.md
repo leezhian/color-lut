@@ -1,29 +1,34 @@
 # <h1 align="center">Color LUT</h1>
 
-颜色查找表**图片**处理程序。
+<div align="center">
 
-*目前仍处于 alpha 版，不建议生产环境使用*。
+颜色查找表“图片”处理程序。
 
 [![Version](https://img.shields.io/npm/v/color-lut?style=flat&colorA=000000&colorB=000000)](https://www.npmjs.com/package/color-lut)
 [![Downloads](https://img.shields.io/npm/dt/color-lut.svg?style=flat&colorA=000000&colorB=000000)](https://www.npmjs.com/package/color-lut)
 [![Build Size](https://img.shields.io/bundlephobia/minzip/color-lut?label=bundle%20size&style=flat&colorA=000000&colorB=000000)](https://bundlephobia.com/result?p=color-lut)
 
+</div>
 
 
-> **V0.5.0-alpha 版** 为主线程版，会阻塞页面渲染，但浏览器支持度最高。
+
+> **V0.5.x 版** 为主线程版，会阻塞页面渲染，但浏览器支持度最高。
 >
-> **V1.0.0-alpha 版** 为 web worker版，因为使用 `type: module` 的原因，目前 Firefox 和 Safari 暂不支持。而且 worker 不能传递函数的原因，导致中间件参数也相继废除（正在努力解决中，看后续是否能解决掉）。
+> **V1.0.x 版** 为 web worker版，因为使用 `type: module` 的原因，目前 Firefox 和 Safari 暂不支持。而且 worker 不能传递函数的原因，导致中间件参数也相继废除（正在努力解决中，看后续是否能解决掉）。
 >
 > 使用 web worker 的原因是处理图片像素数据映射时，是一个非常大的循环处理，比如一张图片是 `1280 * 720` 的尺寸，就高达 921600 个数据要处理，是非常消耗时间的，使用 **V0.5.0-alpha 版** 就会发现很明显的页面阻塞。
 >
 > 如果你有好的解决方案思路可以提 issue 或 email 来分享你的想法！！！
+
+📝 [在线demo](https://codepen.io/leezhian/pen/jOeQKPW)
 
 
 
 ## ✨ 特性
 
 - 目前仅支持图片处理。
-- 支持 `cube` 文件解析。
+- 使用 web worker 处理颜色映射。
+- 支持 `cube` 文件、`CSP` 文件解析。
 
 
 
@@ -75,7 +80,10 @@ console.log(imageData)
 
 ## 🧰 API
 
-<font color="ff0000">注意：在V1.0.0-alpha 版 Middleware 参数全部移除！内部默认使用 mixer 中间件。 </font>
+<font color="ff0000">注意：在V1.0.0-alpha 版 Middleware 参数全部移除！内部默认使用 mixer 中间件。 
+</font>
+
+*暂时没有对 Middleware 的TS类型提示进行移除，只是传入后不生效。*
 
 
 
@@ -106,7 +114,7 @@ lut.use(higher)
 ### `LUT.transform(img: string | ImageData, lutData: string | ColorLUT, middleware?: MiddlewareHandler): ImageData`
 
 - `img`：支持图片URL 及 图片像数数据对象 `ImageData`（[可通过 `Canvas getImageData` 获取](https://developer.mozilla.org/zh-CN/docs/Web/API/CanvasRenderingContext2D/getImageData)）。
-- `lutData`：支持LUT URL（暂只支持 `cube` 格式文件） 及 `ColorLUT` 格式对象（详情可看[ `ColorLUT` 类型](#`ColorLUT` 类型) 解析）。
+- `lutData`：支持LUT URL（支持 `cube` 格式、`CSP`格式文件） 及 `ColorLUT` 格式对象（详情可看[ `ColorLUT` 类型](#`ColorLUT` 类型) 解析）。
 
 - `middleware`：局部中间件，只影响单次转换；功能与全局中间件一致，优先级比全局中间件高。
 
@@ -116,13 +124,19 @@ lut.use(higher)
 
 
 
-### `LUT.formatColorLUT(lutStr: string): ColorLUT`
+### `LUT.formatColorLUTFromCube(lutStr: string): ColorLUT`
 
-- `lutStr`：LUT 文件内容字符串，暂只支持 `cube` 格式文件内容。
+- `lutStr`：`cube` 格式的LUT 文件内容字符串。
 
 
 
 格式化查找表，用于内部映射使用。如果 `transform` 传入是 LUT URL 时，内部会自动调用。
+
+
+
+### `LUT.formatColorLUTFromCSP(str: string): ColorLUT`
+
+- `str`：`CSP` 格式的LUT 文件内容字符串。
 
 
 
