@@ -153,13 +153,16 @@ class LUT {
 
     let colorLUT: ColorLUT
     if (typeof lut === 'string') {
-      const lutStr = this.cache.get(lut) ? this.cache.get(lut) : await getLUTs(lut)
-      colorLUT = /\.csp$/i.test(lut) ? this.formatColorLUTFromCSP(lutStr) : this.formatColorLUTFromCube(lutStr)
+      if(this.cache.get(lut)) {
+        colorLUT = this.cache.get(lut)
+      } else {
+        const lutStr = await getLUTs(lut)
+        colorLUT = /\.csp$/i.test(lut) ? this.formatColorLUTFromCSP(lutStr) : this.formatColorLUTFromCube(lutStr)
+        this.cache.put(lut, colorLUT)
+      }
     } else {
       colorLUT = lut
     }
-
-    console.log('colorLUT', colorLUT);
     
     return this.transformImageData(imageData, colorLUT, middleware ?? this.middleware)
   }
@@ -233,8 +236,6 @@ class LUT {
 
       // 判断是否是标识 lut 文件大小的字段
       if(rgb[0] > 1 && rgb.every(v => v === rgb[0])) {
-        console.log(rgb);
-        
         lutSize = rgb[0]
         return
       }
