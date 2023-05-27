@@ -51,8 +51,8 @@ function createESMConfig(input, output) {
 }
 
 function createUMDConfig(input, output, env) {
-  let name = 'lut'
-  const fileName = output.slice('dist/'.length)
+  let name = 'LUT'
+  const fileName = output.slice('dist/umd/'.length)
   const capitalize = (s) => s.slice(0, 1).toUpperCase() + s.slice(1)
   if (fileName !== 'index') {
     name += fileName.replace(/(\w+)\W*/g, (_, p) => capitalize(p))
@@ -62,7 +62,7 @@ function createUMDConfig(input, output, env) {
     input,
     output: {
       file: `${output}.${env}.js`,
-      format: 'es',
+      format: 'umd',
       name,
     },
     plugins: [
